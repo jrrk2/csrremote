@@ -10,9 +10,9 @@ class UsbDriver
 public:
     UsbDriver();
     ~UsbDriver();
-    bool USBInit(uint16_t vendor, uint16_t device);
+    void USBInit(void);
     void USBRelease(void);
-    //bool IsInitialized(void);
+    bool IsInitialized(void);
     bool ReadData(unsigned char data[], int size);
     bool WriteData(unsigned char data[], int size);
 

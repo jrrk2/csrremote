@@ -1,17 +1,18 @@
 #include "devicemanager.h"
 #include "stopwatch.h"
-#include "programmer.h"
+#include "usbprogrammer.h"
 #include "bc_def.h"
 #include <cstring>
 
-DeviceManager::DeviceManager(Programmer *prog) : programmer(prog)
+DeviceManager::DeviceManager()
 {
-
+    programmer = UsbProgrammer::getProgrammer();
 }
 
 bool DeviceManager::IsSupported()
 {
     uint16_t id;
+    programmer->SetTransferSpeed(0x10);
     if(!programmer->Read(GBL_CHIP_VERSION, &id)) return false;
     return id == 0x4826;
 }
@@ -24,13 +25,13 @@ bool DeviceManager::XapResetAndGo()
     StopWatch timer;
     uint16_t tmp;
 
-    programmer->SetTransferSpeed(20);
+    programmer->SetTransferSpeed(0x189);
     programmer->Write(SPI_EMU_CMD, SPI_EMU_CMD_XAP_RUN_B_MASK);
     timer.start();
     while (timer.elapsedmsec() < 16 )
       programmer->Write(SPI_EMU_CMD, SPI_EMU_CMD_XAP_RUN_B_MASK);
 
-    programmer->SetTransferSpeed(1000);
+    programmer->SetTransferSpeed(4);
     for(int i=0;i<100;i++)
     {
       if ( !programmer->Read(MMU_FLASH_BANK_SELECT, &tmp) )

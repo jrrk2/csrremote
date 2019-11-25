@@ -1,14 +1,14 @@
 #ifndef DEVICEMANAGER_H
 #define DEVICEMANAGER_H
 
-#include "programmer.h"
+#include "usbprogrammer.h"
 
 /* This file servers partially as pttransport.dll transport layer */
 
 class DeviceManager
 {
 public:
-    DeviceManager(Programmer *prog);
+    DeviceManager();
 
     bool XapResetAndGo();
     bool XapResetAndStop();
@@ -17,7 +17,7 @@ public:
     bool IsSupported();
 
 private:
-    Programmer *programmer;
+    UsbProgrammer *programmer;
 };
 
 #endif // DEVICEMANAGER_H

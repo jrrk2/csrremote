@@ -5,30 +5,40 @@ UsbDriver::UsbDriver() :
     ctx(NULL),
     dev_handle(NULL)
 {
-
+    USBInit();
 }
 
-bool UsbDriver::USBInit(uint16_t vendor, uint16_t device)
+void UsbDriver::USBInit(void)
 {
-    if(initialized) return true;
+    if(initialized) return;
+
+    libusb_device **devs;
 
     int r;
+    ssize_t cnt;
     r = libusb_init(&ctx);
 
-    dev_handle = libusb_open_device_with_vid_pid(ctx, vendor, device);
+    cnt = libusb_get_device_list(ctx, &devs);
+    if(cnt < 0) {
+        USBRelease();
+        return;
+    }
+
+    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x0a12,0x0042);
     if(dev_handle == NULL) {
         USBRelease();
-        return false;
+        return;
     }
+
+    libusb_free_device_list(devs, 1);
 
     r = libusb_claim_interface(dev_handle, 0);
     if(r < 0) {
         USBRelease();
-        return false;
+        return;
     }
 
     initialized = true;
-    return true;
 }
 
 void UsbDriver::USBRelease(void)
@@ -51,10 +61,10 @@ UsbDriver::~UsbDriver()
     USBRelease();
 }
 
-/*bool UsbDriver::IsInitialized(void)
+bool UsbDriver::IsInitialized(void)
 {
     return initialized;
-}*/
+}
 
 bool UsbDriver::WriteData(unsigned char data[], int size)
 {

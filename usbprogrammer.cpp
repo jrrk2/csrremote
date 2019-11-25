@@ -1,128 +1,114 @@
 #include "usbprogrammer.h"
+#include "compat.h"
+#include "spifns.h"
+#include "spi.h"
+#include "logging.h"
 
-#define convertEndianess(A) (uint16_t)((((uint16_t)(A) & 0xff00) >> 8) | \
+#define convertEndianess(A) ((((uint16_t)(A) & 0xff00) >> 8) | \
                              (((uint16_t)(A) & 0x00ff) << 8))
 
 #define arr unsigned char[]
 
 #define __packed __attribute__((__packed__))
 
-struct RWPacket{
-    uint16_t cmd;
-    uint8_t  padding;
-    uint16_t addr;
-    uint16_t size;
-    uint16_t data[505];
-} __packed;
+UsbProgrammer *UsbProgrammer::programmer = NULL;
 
 UsbProgrammer::UsbProgrammer()
 {
-    progInit = usb.USBInit(CSRVENDOR,CSRDEVICE);
-    SetMode(true);
-    SetTransferSpeed(20);
-    ClearCmdBits();
-}
-
-bool UsbProgrammer::IsConnected(void)
-{
-    return progInit;
+  //    log_set_options(LOG_LEVEL_DEBUG);
+    spi_set_pinout(SPI_PINOUT_NEXYS4DDR);
+    spifns_init();
+    spi_set_interface("B");
+    spi_open(0);
+    spi_set_clock(100);
+    IsInitialized();
 }
 
 bool UsbProgrammer::ReadBlock(uint16_t addr, int size, uint16_t buffer[])
 {
-    RWPacket packet;
-    packet.cmd = 0x100;
-    packet.padding = 0;
+    if(!IsInitialized()) return false;
 
-    int readed = 0;
-    unsigned short address = addr;
+    if (spifns_sequence_read(addr, size, buffer))
+          return false;
 
-    do {
+    LOG(INFO, "read16(addr=%s, len16=%d)\n", ioregname(addr), size);
 
-        int psize = 0x1F8;
-        if(psize+readed > size)
-            psize = size - readed;
+    return true;
+}
 
-        packet.addr = convertEndianess(address);
-        packet.size = convertEndianess(psize);
+bool UsbProgrammer::Read(uint16_t addr, uint16_t *data)
+{
+    if(!IsInitialized()) return false;
 
-        if(!usb.WriteData((unsigned char*)&packet,7)) return false;
+    if (spifns_sequence_read(addr, 1, data))
+          return false;
 
-        uint16_t tmp[3+psize];
-        if(!usb.ReadData((unsigned char*)tmp,6+psize*2)) return false;
-
-        for(int i=readed; i<readed+psize; i++)
-            buffer[i] = convertEndianess(tmp[3+i-readed]);
-
-        address += psize;
-        readed += psize;
-
-    } while (readed < size);
-
+    LOG(INFO, "read16(addr=%s, rslt=%04x)\n", ioregname(addr), *data);
 
     return true;
 }
 
 bool UsbProgrammer::WriteBlock(uint16_t addr, int size, uint16_t buffer[])
 {
-    RWPacket packet;
-    packet.cmd = 0x200;
-    packet.padding = 0;
+    if(!IsInitialized()) return false;
 
-    int writed = 0;
-    unsigned short address = addr;
+    if (spifns_sequence_write(addr, size, buffer)) return false;
 
-    do {
-
-        int psize = 0x1F8;
-        if(psize+writed > size)
-            psize = size - writed;
-
-        packet.addr = convertEndianess(address);
-        packet.size = convertEndianess(psize);
-
-        for(int i=writed; i<writed+psize; i++)
-            packet.data[i-writed] = convertEndianess(buffer[i]);
-
-        if(!usb.WriteData((unsigned char*)&packet,7+psize*2)) return false;
-
-        address += psize;
-        writed += psize;
-
-    } while (writed < size);
-
+    LOG(INFO, "write16(addr=%s, len16=%d)\n", ioregname(addr), size);
 
     return true;
 }
 
-bool UsbProgrammer::SetTransferSpeed(uint16_t speedkhz)
+bool UsbProgrammer::Write(uint16_t addr, uint16_t data)
 {
-    uint16_t speed = (1000000 / speedkhz - 434) / 126;
+    if(!IsInitialized()) return false;
 
-    uint8_t low = speed;
-    uint8_t high = speed >> 8;
-    unsigned char cmd[] = {0,3,0,high,low};
-    return usb.WriteData(cmd,5);
+    if (spifns_sequence_write(addr, 1, &data)) return false;
+
+    LOG(INFO, "write16(addr=%s data=0x%.04x)\n", ioregname(addr), data);
+
+    return true;
+}
+
+bool UsbProgrammer::SetTransferSpeed(uint16_t speed)
+{
+    spi_set_clock(speed);
+    LOG(INFO, "spi_set_clock(speed=%d)\n", speed);
+    return true;
 }
 
 bool UsbProgrammer::IsXAPStopped(void)
 {
-    uint16_t data[2];
-    unsigned char cmd[] = {0,4,0};
-    usb.WriteData(cmd,3);
-    usb.ReadData((unsigned char*)data,4);
-    return data[1];
+    if(!IsInitialized()) return false;
+
+    switch(spifns_bluecore_xap_stopped())
+      {
+      case SPIFNS_XAP_RUNNING: return false;
+      case SPIFNS_XAP_STOPPED: return true;
+      case SPIFNS_XAP_NO_REPLY: return false;
+      default: return false;
+      }
+}
+
+bool UsbProgrammer::IsInitialized(void)
+{
+    return true;
 }
 
 bool UsbProgrammer::SetMode(bool spi)
 {
-    uint8_t data = spi ? 0 : 0xff;
-    unsigned char cmd[] = {0,9,0,0,data};
-    return usb.WriteData(cmd,5);
+    return true;
 }
 
 bool UsbProgrammer::ClearCmdBits()
 {
-    unsigned char cmd[] = {0,15,0,0,0,0,0};
-    return usb.WriteData(cmd,7);
+    return true;
+}
+
+UsbProgrammer* UsbProgrammer::getProgrammer()
+{
+    if (programmer == NULL)
+        programmer = new UsbProgrammer();
+
+    return programmer;
 }
