@@ -34,7 +34,8 @@ int main(int argc, char **argv) {
       else if (loglvl == "WARN") log_set_options(LOG_LEVEL_WARN);
       else if (loglvl == "ERR") log_set_options(LOG_LEVEL_ERR);
       else if (loglvl == "ALL") log_set_options(LOG_LEVEL_ALL);
-      else cout << "loglevel should be DEBUG, INFO, WARN or ERR" << endl;
+      else cout << "loglevel should be DEBUG, INFO, WARN, ERR or ALL" << endl;
+      /* drop through deliberately */
     case 5:
       last = atoi(argv[4]);
       first = atoi(argv[3]);
@@ -50,12 +51,6 @@ int main(int argc, char **argv) {
     }
 
     string action = argv[1];
-    if(action != "dump" && action != "flash") {
-      cout << "Invalid action!" << endl;
-      usage(argv[0]);
-      return 0;
-    }
-    
     string stem = argv[2];
 
     if(!UsbProgrammer::getProgrammer()->IsInitialized()) {
@@ -68,18 +63,38 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    cout << "first: " << first << " last: " << last << endl;
+    if (action == "dump") {
+      cout << "first: " << first << " last: " << last << endl;
 
-    if(action == "dump") {
-      if(!flash.dump(stem+".xdv", stem+".xpv", first, last)) {
+      if (!flash.dump(stem+".xdv", stem+".xpv", first, last)) {
             cout << "Dumping failed!" << endl;
             return 1;
         }
-    } else if(action == "flash"){
+    } else if (action == "psdump") {
+      if (!flash.psdump(stem+".ps")) {
+            cout << "Dumping failed!" << endl;
+            return 1;
+        }
+    } else if (action == "flash") {
         cout << "Action currently not supported!" << endl;
-    }
+    } else if (action == "pschk") {
+      if (!flash.pschk(stem+".xdv")) {
+            cout << " PSchk failed!" << endl;
+            return 1;
+        }
+    } else if (action == "psmod") {
+      if (!flash.psmod(stem+".xdv")) {
+            cout << " PSmod failed!" << endl;
+            return 1;
+        }
+    } else
+      {
+        cout << "Invalid action!" << endl;
+        usage(argv[0]);
+        return 0;
+      }
 
-    manager.XapResetAndGo();
+    //    manager.XapResetAndGo();
 
     return 0;
 }

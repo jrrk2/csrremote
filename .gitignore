@@ -1,5 +1,4 @@
 # C++ objects and libs
-
 *.slo
 *.lo
 *.o
@@ -18,3 +17,17 @@ moc_*.cpp
 qrc_*.cpp
 Makefile
 *-build-*
+
+# backups
+
+*~
+
+# data files
+
+*.xpv
+*.xdv
+*.ps
+logfile
+
+# executable
+CsrUsbProg

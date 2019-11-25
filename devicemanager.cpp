@@ -12,11 +12,14 @@ DeviceManager::DeviceManager()
 bool DeviceManager::IsSupported()
 {
     uint16_t id;
-    programmer->SetTransferSpeed(0x10);
+    programmer->SetTransferSpeed(1);
     if(!programmer->Read(GBL_CHIP_VERSION, &id)) return false;
+    programmer->SetTransferSpeed(16);
+    //    XapStop();
     return id == 0x4826;
 }
 
+#if 0
 bool DeviceManager::XapResetAndGo()
 {
     if(!IsSupported()) return false;
@@ -25,7 +28,7 @@ bool DeviceManager::XapResetAndGo()
     StopWatch timer;
     uint16_t tmp;
 
-    programmer->SetTransferSpeed(0x189);
+    programmer->SetTransferSpeed(4);
     programmer->Write(SPI_EMU_CMD, SPI_EMU_CMD_XAP_RUN_B_MASK);
     timer.start();
     while (timer.elapsedmsec() < 16 )
@@ -67,16 +70,22 @@ bool DeviceManager::XapResetAndGo()
 
     return true;
 }
+#endif
 
 bool DeviceManager::XapResetAndStop()
 {
     if(!IsSupported()) return false;
 
-    int status;
+    int status, elapsed;
     uint16_t tmp;
     StopWatch timer;
 
-    XapResetAndGo();
+    programmer->Write(RSTGEN_WATCHDOG_DELAY, 2);
+    programmer->Write(GBL_RST_ENABLES, RST_WATCHDOG_EN_MASK |
+                                       RST_FULL_CHIP_RESET);
+    programmer->Write(RSTGEN_WATCHDOG_KICK, 1);
+    programmer->Write(SPI_EMU_CMD, 0);
+
     timer.start();
     do
     {
@@ -85,8 +94,9 @@ bool DeviceManager::XapResetAndStop()
             status = 0;
         else
             ++status;
+        elapsed = timer.elapsedmsec();
     }
-    while ( status < 2 && timer.elapsedmsec() < 8 );
+    while ( status < 3 && elapsed < 10 );
 
     if(status < 2)
         return false;
@@ -111,14 +121,16 @@ bool DeviceManager::XapStop()
 {
     if(!IsSupported()) return false;
 
-    uint16_t data[0x6B];//,tmp;
-
+    uint16_t data[SPI_USER_CMD];
+    memset(data, 0, sizeof(data));
+    
     for (int i = 0; i < 20; ++i )
         programmer->Write(SPI_EMU_CMD, SPI_EMU_CMD_XAP_RUN_B_MASK);
 
     memset(data, 0, sizeof(data));
+    data[SPI_EMU_CMD] = SPI_EMU_CMD_XAP_RUN_B_MASK;
 
-    programmer->WriteBlock(0, 0x6B, data);
+    programmer->WriteBlock(0, SPI_USER_CMD, data);
     programmer->Write(SPI_EMU_CMD, SPI_EMU_CMD_XAP_RUN_B_MASK);
     programmer->Write(SPI_EMU_CMD, SPI_EMU_CMD_XAP_RUN_B_MASK);
 

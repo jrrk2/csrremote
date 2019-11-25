@@ -15,6 +15,9 @@ class Flash
 public:
     Flash();
     bool dump(string xdvfilename, string xpvfilename, int first, int last);
+    bool psdump(string psfilename);
+    bool pschk(string psfilename);
+    bool psmod(string psfilename);
 
 private:
     uint32_t calc_crc(uint16_t *buffer, uint32_t length);
@@ -24,6 +27,7 @@ private:
     int read_flash_size();
     uint32_t read_flashcrc();
     void setsector(uint32_t sector);
+    void tryblock(uint16_t buffer[], int x);
 
 private:
     UsbProgrammer *programmer;
