@@ -61,6 +61,39 @@ Flash::Flash()
     programmer = UsbProgrammer::getProgrammer();
 }
 
+#if 0
+void Flash::cfi()
+{
+        uint16_t cfibuf[80];
+        int i;
+
+        cout << "Reading flash CFI" << endl;
+        
+        programmer->Write(boot_cmd,1); // CFI
+        manager.XapGo();
+        wait_to_stop(5000);        
+        programmer->ReadBlock(boot_page_buffer0, 80, cfibuf);
+        cout << hex << setfill('0');
+        for (i = 0; i < 80; i++) cout << cfibuf[i] << " ";
+        cout << endl;
+}
+
+void Flash::unprotect()
+{
+        uint16_t tmpbuf[128];
+        int i;
+
+        uint16_t sectors = read_flash_size();
+        cout << "Trying to unprotect flash " << endl;
+
+        for (i = 0; i < sectors; i++) tmpbuf[i] = 1;
+        programmer->WriteBlock(boot_page_buffer0, 128, tmpbuf);
+        
+        programmer->Write(boot_cmd,3); // unprotect
+        manager.XapGo();
+        wait_to_stop(5000);        
+}
+
 void Flash::sendblock(uint16_t buffer[], int x)
 {
   uint16_t read_buffer[0x1000], tmpbuf[128];
@@ -70,12 +103,12 @@ void Flash::sendblock(uint16_t buffer[], int x)
         cout << "Trying to send sector " << x << endl;
 
         for (i = 0; i < sectors; i++) tmpbuf[i] = 1;
-        programmer->WriteBlock(boot_page_buffer0, 0x1000, tmpbuf);
+        programmer->WriteBlock(boot_page_buffer0, 128, tmpbuf);
         
-        setsector(sector_addr);
-        programmer->Write(boot_cmd,3); // unprotect ?
+        programmer->Write(boot_cmd,3); // unprotect
         manager.XapGo();
         wait_to_stop(300);
+        
         programmer->WriteBlock(boot_page_buffer0, 0x1000, buffer);
 
         setsector(sector_addr);
@@ -106,6 +139,7 @@ void Flash::sendblock(uint16_t buffer[], int x)
           }
 #endif        
 }
+#endif
 
 void Flash::dumpblock(uint16_t buffer[], int x)
 {
@@ -144,7 +178,7 @@ bool Flash::dump(string xdvfilename, string xpvfilename, int first, int last)
       {
         if (sector_count <= last)
           {
-            cout << "last sector: " << last << " out of range (sector count = " << sector_count << ")" << endl;;
+            cout << "last sector: " << last << " out of range (sector count = " << sector_count << ")" << endl;
             return false;
           }
       }
@@ -186,10 +220,16 @@ bool Flash::psmod(string psfilename)
     if(!bootprog_load_and_run()) return false;
 
     programmer->SetTransferSpeed(4);
-    static uint16_t buffer[Pskey::buffer_size];
-    dumpblock(buffer, 3);
-    Pskey::modify(buffer);
-    sendblock(buffer, 3);
+    uint16_t buffer[0x4000];
+    memset(buffer, -1, sizeof(buffer));
+    for(int x=2; x <= 3; x++) dumpblock(buffer+x*0x1000, x);
+    Pskey::detect(buffer);
+    download(programmer->ReadBlock,
+             programmer->Read,
+             programmer->WriteBlock,
+             programmer->Write,
+             programmer->IsXAPStopped,
+             buffer, 2, 3);
     return true;
 }
 
@@ -200,15 +240,30 @@ bool Flash::chiperase()
     return true;
 }
 
-bool Flash::downloadall(string xdvfilename, string xpvfilename)
+bool Flash::downloadall(string xdvfilename, string xpvfilename, int first, int last)
 {
   enum {maxlen=0x80000};
+  int sector_count;
   static uint16_t buffer[maxlen];
   memset(buffer, -1, sizeof(buffer));
   readhex(xdvfilename.c_str(), buffer, maxlen, 0);
   readhex(xpvfilename.c_str(), buffer, maxlen, 0x10000);
   if(!manager.XapResetAndStop()) return false;
-  download(programmer->ReadBlock, programmer->Read,  programmer->WriteBlock, programmer->Write, programmer->IsXAPStopped, buffer);
+  if(!bootprog_load_and_run()) return false;
+  sector_count = read_flash_size();
+  if (last)
+    {
+      if (sector_count <= last)
+        {
+          cout << "last sector: " << last << " out of range (sector count = " << sector_count << ")" << endl;;
+          return false;
+        }
+    }
+  else
+    last = sector_count - 1;
+  
+  cout << "Flashing started (first=" << first << ", last=" << last << ")" << endl;
+  download(programmer->ReadBlock, programmer->Read,  programmer->WriteBlock, programmer->Write, programmer->IsXAPStopped, buffer, first, last);
   return true;
 }
 

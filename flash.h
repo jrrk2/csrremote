@@ -21,8 +21,10 @@ public:
     bool pschk(string psfilename);
     bool psmod(string psfilename);
     void readhex(string psfilename, uint16_t buffer[], size_t len, size_t off);
+    void cfi();
     bool chiperase();
-    bool downloadall(string xdvfilename, string xpvfilename);
+    void unprotect();
+    bool downloadall(string xdvfilename, string xpvfilename, int first, int last);
 
 private:
     uint32_t calc_crc(uint16_t *buffer, uint32_t length);

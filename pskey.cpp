@@ -631,17 +631,17 @@ void Pskey::cnv(uint16_t buffer[])
         }
 }
 
-void Pskey::modify(uint16_t buffer[])
+void Pskey::modify(uint16_t buffer[], int bias)
 {
     int i, off = 0;
     int vm_disabled = 0;
     int offchip_hci = 0;
     while (off < buffer_size-4)
       {
-        uint16_t keyid = buffer[off];
+        uint16_t keyid = buffer[bias+off];
         uint16_t keyid2 = keyid & ~0x2000;
-        uint16_t actchksum = buffer[off+1];
-        uint16_t len = buffer[off+2];
+        uint16_t actchksum = buffer[bias+off+1];
+        uint16_t len = buffer[bias+off+2];
         uint16_t *value = buffer+off+3;
         uint16_t i, expchksum = keyid + len;
         if ((keyid != 0xFFFF) && (len != 0xFFFF))
@@ -667,28 +667,38 @@ void Pskey::modify(uint16_t buffer[])
           {
             if (!vm_disabled)
               {
-                buffer[off] = PSKEY_VM_DISABLE | 0x2000;
-                buffer[off+2] = 1;
-                buffer[off+3] = 1;
-                buffer[off+1] = buffer[off] + buffer[off+2] + buffer[off+3];
+                buffer[bias+off] = PSKEY_VM_DISABLE | 0x2000;
+                buffer[bias+off+2] = 1;
+                buffer[bias+off+3] = 1;
+                buffer[bias+off+1] = buffer[bias+off] + buffer[bias+off+2] + buffer[bias+off+3];
                 off += 4;
               }
             if (!offchip_hci)
               {
-                buffer[off] = PSKEY_ONCHIP_HCI_CLIENT | 0x2000;
-                buffer[off+2] = 1;
-                buffer[off+3] = 0;
-                buffer[off+1] = buffer[off] + buffer[off+2] + buffer[off+3];
+                buffer[bias+off] = PSKEY_ONCHIP_HCI_CLIENT | 0x2000;
+                buffer[bias+off+2] = 1;
+                buffer[bias+off+3] = 0;
+                buffer[bias+off+1] = buffer[bias+off] + buffer[bias+off+2] + buffer[bias+off+3];
                 off += 4;
               }
             off = buffer_size;
           }
       }
+    cnv(buffer+bias);
     ofstream xdv("psmod.xdv");
     xdv << hex << setfill('0');    
     for (i = 0; i < buffer_size; i++)
         {
-          xdv << "@" << setw(6) << 3*0x1000 + i
-                 << " " << setw(4) << buffer[i] << '\r' << endl;
+          xdv << "@" << setw(6) << bias + i
+                 << " " << setw(4) << buffer[bias+i] << '\r' << endl;
         }
+}
+
+void Pskey::detect(uint16_t buffer[])
+{
+  uint16_t blank[buffer_size];
+  memset(blank, -1, sizeof(blank));
+  if (memcmp(blank, buffer+0x2000, sizeof(blank))) modify(buffer,0x2000);
+  else if (memcmp(blank, buffer+0x3000, sizeof(blank))) modify(buffer,0x3000);
+  else cout << "no pskeys found" << endl;
 }

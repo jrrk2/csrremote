@@ -9,7 +9,7 @@ extern "C" {
                bool (*writeblock)(uint16_t addr, int size, uint16_t buffer[]),
                bool (*write)(uint16_t addr, uint16_t data),
                bool (*_IsXAPStopped)(void),
-               uint16_t writebuf[]);
+               uint16_t writebuf[], int first, int last);
 #ifdef __cplusplus
 };
 #endif  

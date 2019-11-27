@@ -4,6 +4,7 @@
 #include "devicemanager.h"
 #include "flash.h"
 #include "logging.h"
+#include "disass.h"
 
 using namespace std;
 
@@ -86,7 +87,7 @@ int main(int argc, char **argv) {
             return 1;
         }
     } else if (action == "flash") {
-      if (!flash.downloadall(stem+".xdv", stem+".xpv")) {
+      if (!flash.downloadall(stem+".xdv", stem+".xpv", first, last)) {
             cout << " Download failed!" << endl;
             return 1;
         }
@@ -95,6 +96,9 @@ int main(int argc, char **argv) {
             cout << " Erase failed!" << endl;
             return 1;
         }
+    } else if (action == "disass") {
+      string dis = stem+".dis";
+      disass(dis.c_str());
     } else
       {
         cout << "Invalid action!" << endl;
