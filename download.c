@@ -44,6 +44,18 @@ static bool wait_xap_stopped(void)
   return 1;
 }
 
+static void progiter1(void)
+{
+ wait_xap_stopped();
+ read16_1(0xc000); /* returned */
+ read16_1(0xc000); /* returned*/
+ read16_1(0xc00a); /* returned*/
+ read16_1(0xc00a); /* returned*/
+ read16_1(0xc00b); /* returned*/
+ read16_1(0xc00b); /* returned*/
+
+}
+
 int download(  bool (*_readblock)(uint16_t, int, uint16_t *),
                bool (*_read)(uint16_t addr, uint16_t *data),
                bool (*_writeblock)(uint16_t addr, int size, uint16_t buffer[]),
@@ -1607,53 +1619,26 @@ read16_1(0xff9a); /* returned 0x4826
      if (sector%2 == 0)
        {
          write16(0xa000, 4096, writebuf+(sector<<12));
-         if (sector)
-           {
-             wait_xap_stopped();
-             read16_1(0xc000); /* returned*/
-             read16_1(0xc000); /* returned*/
-             read16_1(0xc00a); /* returned*/
-             read16_1(0xc00a); /* returned*/
-             read16_1(0xc00b); /* returned*/
-             read16_1(0xc00b); /* returned*/
-           }
+         if (sector) progiter1();
          write16_1(0xc008, sector >> 4); /**/
          write16_1(0xc009, sector << 12); /**/
          write16_1(0xc000, 0x0006); /**/
-         read16_1(0xc000); /* returned*/
-         write16_1(0x006a, 0x0002); /**/
-         write16_1(0x006a, 0x0003); /**/
-         write16_1(0x006a, 0x0002); /**/
-         write16_1(0x006a, 0x0001); /**/
        }
      else
        {
          write16(0xb000, 4096, writebuf+(sector<<12));
-         wait_xap_stopped();
-         read16_1(0xc000); /* returned */
-         read16_1(0xc000); /* returned */
-         read16_1(0xc00a); /* returned */
-         read16_1(0xc00a); /* returned */
-         read16_1(0xc00b); /* returned */
-         read16_1(0xc00b); /* returned */
-         write16_1(0xc008, 0x0000); /**/
-         write16_1(0xc009, 0x1000); /**/
+         progiter1();
+         write16_1(0xc008, sector >> 4); /**/
+         write16_1(0xc009, sector << 12); /**/
          write16_1(0xc000, 0x0007); /**/
-         read16_1(0xc000); /* returned */
-         write16_1(0x006a, 0x0002); /**/
-         write16_1(0x006a, 0x0003); /**/
-         write16_1(0x006a, 0x0002); /**/
-         write16_1(0x006a, 0x0001); /**/
        }
-     
+     read16_1(0xc000); /* returned */
+     write16_1(0x006a, 0x0002); /**/
+     write16_1(0x006a, 0x0003); /**/
+     write16_1(0x006a, 0x0002); /**/
+     write16_1(0x006a, 0x0001); /**/
    }
- wait_xap_stopped();
- read16_1(0xc000); /* returned */
- read16_1(0xc000); /* returned*/
- read16_1(0xc00a); /* returned*/
- read16_1(0xc00a); /* returned*/
- read16_1(0xc00b); /* returned*/
- read16_1(0xc00b); /* returned*/
+ progiter1();
  spi_set_clock(20); /**/
 write16_1(0x006a, 0x0003); /**/
 spi_set_clock(20); /**/
