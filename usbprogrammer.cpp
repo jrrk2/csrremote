@@ -79,15 +79,18 @@ bool UsbProgrammer::SetTransferSpeed(uint16_t speed)
 
 bool UsbProgrammer::IsXAPStopped(void)
 {
-    if(!IsInitialized()) return false;
+    bool retval;
+    if(!IsInitialized()) retval = false;
 
     switch(spifns_bluecore_xap_stopped())
       {
-      case SPIFNS_XAP_RUNNING: return false;
-      case SPIFNS_XAP_STOPPED: return true;
-      case SPIFNS_XAP_NO_REPLY: return false;
-      default: return false;
+      case SPIFNS_XAP_RUNNING: retval = false; break;
+      case SPIFNS_XAP_STOPPED: retval = true; break;
+      case SPIFNS_XAP_NO_REPLY: retval = false; break;
+      default: retval = false; break;
       }
+    LOG(INFO, "spifns_bluecore_xap_stopped() returned %d\n", retval);
+    return retval;
 }
 
 bool UsbProgrammer::IsInitialized(void)

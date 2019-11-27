@@ -61,7 +61,53 @@ Flash::Flash()
     programmer = UsbProgrammer::getProgrammer();
 }
 
-void Flash::tryblock(uint16_t buffer[], int x)
+void Flash::sendblock(uint16_t buffer[], int x)
+{
+  uint16_t read_buffer[0x1000], tmpbuf[128];
+        int i, sector_addr = x*0x1000;
+
+        uint16_t sectors = read_flash_size();
+        cout << "Trying to send sector " << x << endl;
+
+        for (i = 0; i < sectors; i++) tmpbuf[i] = 1;
+        programmer->WriteBlock(boot_page_buffer0, 0x1000, tmpbuf);
+        
+        setsector(sector_addr);
+        programmer->Write(boot_cmd,3); // unprotect ?
+        manager.XapGo();
+        wait_to_stop(300);
+        programmer->WriteBlock(boot_page_buffer0, 0x1000, buffer);
+
+        setsector(sector_addr);
+        programmer->Write(boot_cmd,6); // program from A000, 7 to program from B000
+        manager.XapGo();
+        wait_to_stop(300);
+#if 0
+        setsector(sector_addr);
+        programmer->Write(boot_cmd,4); // readback
+        manager.XapGo();
+        wait_to_stop(300);
+
+        programmer->ReadBlock(boot_page_buffer0, 0x1000, read_buffer);
+        
+        uint32_t readed_crc = read_flashcrc();
+        uint32_t calculated_crc = calc_crc(read_buffer,0x1000);
+        if(readed_crc != calculated_crc)
+            cout << "CRC DON'T match - Readed: 0x" << hex << readed_crc
+                 << " Calulated: 0x" << calculated_crc << dec << endl;
+
+        for (i = 0; i < 0x1000; i++)
+          {
+            if (buffer[i] != read_buffer[i])
+              {
+              cout << "first difference at index: " << i << endl;
+              break;
+              }
+          }
+#endif        
+}
+
+void Flash::dumpblock(uint16_t buffer[], int x)
 {
         int sector_addr = x*0x1000;
         cout << "Trying to read sector " << x << endl;
@@ -110,7 +156,7 @@ bool Flash::dump(string xdvfilename, string xpvfilename, int first, int last)
     cout << "Dumping started (first=" << first << ", last=" << last << ")" << endl;
     timer.start();
     for(int x=first; x<= last; x++) {
-      tryblock(buffer, x);
+      dumpblock(buffer, x);
 
         for(int index=0; index<0x1000; index++) {
           (x >= 16 ? xpv : xdv) << "@" << setw(6) << x*0x1000 + index - (x >= 16 ? 0x10000 : 0)
@@ -129,7 +175,7 @@ bool Flash::psdump(string psfilename)
 
     programmer->SetTransferSpeed(4);
     static uint16_t buffer[Pskey::buffer_size];
-    tryblock(buffer, 3);
+    dumpblock(buffer, 3);
     Pskey::cnv(buffer);
     return true;
 }
@@ -141,54 +187,54 @@ bool Flash::psmod(string psfilename)
 
     programmer->SetTransferSpeed(4);
     static uint16_t buffer[Pskey::buffer_size];
-    tryblock(buffer, 3);
+    dumpblock(buffer, 3);
     Pskey::modify(buffer);
+    sendblock(buffer, 3);
     return true;
+}
+
+bool Flash::chiperase()
+{
+    if(!manager.XapResetAndStop()) return false;
+    erase(programmer->ReadBlock, programmer->Read,  programmer->WriteBlock, programmer->Write, programmer->IsXAPStopped);
+    return true;
+}
+
+bool Flash::downloadall(string xdvfilename, string xpvfilename)
+{
+  enum {maxlen=0x80000};
+  static uint16_t buffer[maxlen];
+  memset(buffer, -1, sizeof(buffer));
+  readhex(xdvfilename.c_str(), buffer, maxlen, 0);
+  readhex(xpvfilename.c_str(), buffer, maxlen, 0x10000);
+  if(!manager.XapResetAndStop()) return false;
+  download(programmer->ReadBlock, programmer->Read,  programmer->WriteBlock, programmer->Write, programmer->IsXAPStopped, buffer);
+  return true;
+}
+
+void Flash::readhex(string hexf, uint16_t buffer[], size_t len, size_t off)
+{
+  int addr, value, valid, noeof;
+  char linbuf[99];
+  ifstream xdv(hexf.c_str());
+  do {
+      noeof = xdv.good();
+      xdv.getline(linbuf, sizeof(linbuf));
+      sscanf(linbuf, "@%x %x", &addr, &value);
+      valid = (addr >= 0 && (addr+off) < len);
+      if (valid)
+        {
+          buffer[off + addr] = value;
+        }
+    } while (valid && noeof);
+  xdv.close();
 }
 
 bool Flash::pschk(string xdvfilename)
 {
-  int addr, value, valid, noeof;
-    char linbuf[99];
-    static uint16_t buffer[Pskey::buffer_size];
-    ifstream xdv(xdvfilename.c_str());
-
-#if 0    
-    // get pointer to associated buffer object
-    std::filebuf* pbuf = xdv.rdbuf();
-
-    // get file size using buffer's members
-    std::size_t size = pbuf->pubseekoff (0,xdv.end,xdv.in);
-    pbuf->pubseekpos (0,xdv.in);
-
-    // allocate memory to contain file data
-    char* fbuf=new char[size];
-
-    // get file data
-    pbuf->sgetn (fbuf,size);
-
-    // write content to stdout
-    std::cout.write (fbuf,size);
-
-    delete[] fbuf;
-      
-#else
+    static uint16_t buffer[0x10000];
     memset(buffer, -1, sizeof(buffer));
-    do {
-      noeof = xdv.good();
-      xdv.getline(linbuf, sizeof(linbuf));
-      sscanf(linbuf, "@%x %x", &addr, &value);
-      valid = (addr >= 0x2000 && addr < 0x4000);
-      if (valid)
-        {
-          buffer[addr & 0xFFF] = value;
-        }
-    } while (valid && noeof);
-
-    
-#endif
-    
-    xdv.close();
+    readhex(xdvfilename.c_str(), buffer, Pskey::buffer_size, 0);
 
     Pskey::cnv(buffer);
     return true;

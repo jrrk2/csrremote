@@ -75,8 +75,6 @@ int main(int argc, char **argv) {
             cout << "Dumping failed!" << endl;
             return 1;
         }
-    } else if (action == "flash") {
-        cout << "Action currently not supported!" << endl;
     } else if (action == "pschk") {
       if (!flash.pschk(stem+".xdv")) {
             cout << " PSchk failed!" << endl;
@@ -85,6 +83,16 @@ int main(int argc, char **argv) {
     } else if (action == "psmod") {
       if (!flash.psmod(stem+".xdv")) {
             cout << " PSmod failed!" << endl;
+            return 1;
+        }
+    } else if (action == "flash") {
+      if (!flash.downloadall(stem+".xdv", stem+".xpv")) {
+            cout << " Download failed!" << endl;
+            return 1;
+        }
+    } else if (action == "erase") {
+      if (!flash.chiperase()) {
+            cout << " Erase failed!" << endl;
             return 1;
         }
     } else

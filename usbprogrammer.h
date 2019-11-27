@@ -12,13 +12,13 @@ class UsbProgrammer
 {
 public:
     static UsbProgrammer* getProgrammer();
-    bool ReadBlock(uint16_t addr, int size, uint16_t buffer[]);
-    bool Read(uint16_t addr, uint16_t *data);
-    bool WriteBlock(uint16_t addr, int size, uint16_t buffer[]);
-    bool Write(uint16_t addr, uint16_t data);
+    static bool ReadBlock(uint16_t addr, int size, uint16_t buffer[]);
+    static bool Read(uint16_t addr, uint16_t *data);
+    static bool WriteBlock(uint16_t addr, int size, uint16_t buffer[]);
+    static bool Write(uint16_t addr, uint16_t data);
     bool SetTransferSpeed(uint16_t speed);
-    bool IsXAPStopped(void);
-    bool IsInitialized(void);
+    static bool IsXAPStopped(void);
+    static bool IsInitialized(void);
     bool SetMode(bool spi);
     bool ClearCmdBits();
 

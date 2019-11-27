@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include "usbprogrammer.h"
 #include "devicemanager.h"
+#include "download.h"
+#include "erase.h"
 
 /* This file servers as flash.dll */
 
@@ -18,6 +20,9 @@ public:
     bool psdump(string psfilename);
     bool pschk(string psfilename);
     bool psmod(string psfilename);
+    void readhex(string psfilename, uint16_t buffer[], size_t len, size_t off);
+    bool chiperase();
+    bool downloadall(string xdvfilename, string xpvfilename);
 
 private:
     uint32_t calc_crc(uint16_t *buffer, uint32_t length);
@@ -27,7 +32,8 @@ private:
     int read_flash_size();
     uint32_t read_flashcrc();
     void setsector(uint32_t sector);
-    void tryblock(uint16_t buffer[], int x);
+    void dumpblock(uint16_t buffer[], int x);
+    void sendblock(uint16_t buffer[], int x);
 
 private:
     UsbProgrammer *programmer;
