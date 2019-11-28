@@ -59,6 +59,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    manager.wakeup();
+    
     if(!manager.IsSupported()) {
         cout << "Device is NOT supported!" << endl;
         return 1;
@@ -72,17 +74,17 @@ int main(int argc, char **argv) {
             return 1;
         }
     } else if (action == "psdump") {
-      if (!flash.psdump(stem+".ps")) {
+      if (!flash.psdump(stem)) {
             cout << "Dumping failed!" << endl;
             return 1;
         }
     } else if (action == "pschk") {
-      if (!flash.pschk(stem+".xdv")) {
+      if (!flash.pschk(stem)) {
             cout << " PSchk failed!" << endl;
             return 1;
         }
     } else if (action == "psmod") {
-      if (!flash.psmod(stem+".xdv")) {
+      if (!flash.psmod(stem)) {
             cout << " PSmod failed!" << endl;
             return 1;
         }

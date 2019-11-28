@@ -202,19 +202,7 @@ bool Flash::dump(string xdvfilename, string xpvfilename, int first, int last)
     return true;
 }
 
-bool Flash::psdump(string psfilename)
-{
-    if(!manager.XapResetAndStop()) return false;
-    if(!bootprog_load_and_run()) return false;
-
-    programmer->SetTransferSpeed(4);
-    static uint16_t buffer[Pskey::buffer_size];
-    dumpblock(buffer, 3);
-    Pskey::cnv(buffer);
-    return true;
-}
-
-bool Flash::psmod(string psfilename)
+bool Flash::psdump(string stem)
 {
     if(!manager.XapResetAndStop()) return false;
     if(!bootprog_load_and_run()) return false;
@@ -223,7 +211,20 @@ bool Flash::psmod(string psfilename)
     uint16_t buffer[0x4000];
     memset(buffer, -1, sizeof(buffer));
     for(int x=2; x <= 3; x++) dumpblock(buffer+x*0x1000, x);
-    Pskey::detect(buffer);
+    Pskey::detect(buffer, stem, Pskey::cnv);
+    return true;
+}
+
+bool Flash::psmod(string stem)
+{
+    if(!manager.XapResetAndStop()) return false;
+    if(!bootprog_load_and_run()) return false;
+
+    programmer->SetTransferSpeed(4);
+    uint16_t buffer[0x4000];
+    memset(buffer, -1, sizeof(buffer));
+    for(int x=2; x <= 3; x++) dumpblock(buffer+x*0x1000, x);
+    Pskey::detect(buffer, stem, Pskey::modify);
     download(programmer->ReadBlock,
              programmer->Read,
              programmer->WriteBlock,
@@ -285,13 +286,14 @@ void Flash::readhex(string hexf, uint16_t buffer[], size_t len, size_t off)
   xdv.close();
 }
 
-bool Flash::pschk(string xdvfilename)
+bool Flash::pschk(string stem)
 {
+    string xdvfilename = stem+".xdv";
     static uint16_t buffer[0x10000];
     memset(buffer, -1, sizeof(buffer));
     readhex(xdvfilename.c_str(), buffer, Pskey::buffer_size, 0);
 
-    Pskey::cnv(buffer);
+    Pskey::detect(buffer, stem, Pskey::cnv);
     return true;
 }
 

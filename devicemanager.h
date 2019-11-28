@@ -10,6 +10,7 @@ class DeviceManager
 public:
     DeviceManager();
 
+    bool wakeup();
     bool XapResetAndGo();
     bool XapResetAndStop();
     bool XapGo();

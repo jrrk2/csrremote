@@ -9,6 +9,16 @@ DeviceManager::DeviceManager()
     programmer = UsbProgrammer::getProgrammer();
 }
 
+bool DeviceManager::wakeup()
+{
+  enum {siz = SPI_EMU_CMD + 1};
+  uint16_t tmp107[siz];
+  memset(tmp107, 0, sizeof(tmp107));
+  programmer->SetTransferSpeed(16);
+  tmp107[SPI_EMU_CMD] = SPI_EMU_CMD_XAP_RUN_B_MASK;
+  programmer->WriteBlock(0, siz, tmp107);
+}
+
 bool DeviceManager::IsSupported()
 {
     uint16_t id;

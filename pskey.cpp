@@ -590,18 +590,18 @@ const char *Pskey::nam(int pskey)
     }
 }
 
-void Pskey::cnv(uint16_t buffer[])
+void Pskey::cnv(uint16_t buffer[], int bias, string dumpstr)
 {
     int i, off = 0;
     char *pstab[pskey_max];
     memset(pstab, 0, sizeof(pstab));
     while (off < buffer_size-4)
       {
-        uint16_t keyid = buffer[off];
+        uint16_t keyid = buffer[bias+off];
         uint16_t keyid2 = keyid & ~0x2000;
-        uint16_t actchksum = buffer[off+1];
-        uint16_t len = buffer[off+2];
-        uint16_t *value = buffer+off+3;
+        uint16_t actchksum = buffer[bias+off+1];
+        uint16_t len = buffer[bias+off+2];
+        uint16_t *value = buffer+bias+off+3;
         uint16_t i, expchksum = keyid + len;
         char ascbuf[len*5+10];
         *ascbuf = 0;
@@ -623,7 +623,7 @@ void Pskey::cnv(uint16_t buffer[])
         else
           off += 4;
       }
-    ofstream psf("psdump.ps");
+    ofstream psf(dumpstr+".ps.txt");
     for (i = 0; i < pskey_max; i++)
       if (pstab[i])
         {
@@ -631,11 +631,36 @@ void Pskey::cnv(uint16_t buffer[])
         }
 }
 
-void Pskey::modify(uint16_t buffer[], int bias)
+struct myps {
+  bool found;
+  bool forced;
+  uint16_t value;
+} myconfig[0x1000];
+
+static void set_config(uint16_t key, uint16_t value)
+{
+  myconfig[key].value = value;
+  myconfig[key].forced = true;
+}
+
+static void modifyitem(uint16_t buffer[], int bias, int off, uint16_t key, uint16_t value)
+{
+  buffer[bias+off] = key | 0x2000;
+  buffer[bias+off+2] = 1; /* we only need to support length 1 keys */
+  buffer[bias+off+3] = value;
+  buffer[bias+off+1] = buffer[bias+off] + buffer[bias+off+2] + buffer[bias+off+3];
+}
+
+void Pskey::modify(uint16_t buffer[], int bias, string dumpstr)
 {
     int i, off = 0;
-    int vm_disabled = 0;
-    int offchip_hci = 0;
+    int baud = 115200;
+    int div = ((baud<<12)/500000+1)/2;
+    set_config(PSKEY_VM_DISABLE, 1);
+    set_config(PSKEY_ONCHIP_HCI_CLIENT, 0);
+    set_config(PSKEY_UART_CONFIG_BCSP, 0x0806);
+    set_config(PSKEY_HOST_INTERFACE, 1);
+    set_config(PSKEY_UART_BAUDRATE, div);
     while (off < buffer_size-4)
       {
         uint16_t keyid = buffer[bias+off];
@@ -650,42 +675,29 @@ void Pskey::modify(uint16_t buffer[], int bias)
               {
                 expchksum += value[i];
               }
-            if (keyid && (expchksum == actchksum)) switch(keyid2)
+            if (keyid && (expchksum == actchksum) && (len==1))
               {
-              case PSKEY_VM_DISABLE:
-                vm_disabled = 1;
-                *value = 1;
-                break;
-              case PSKEY_ONCHIP_HCI_CLIENT:
-                offchip_hci = 1;
-                *value = 0;
-                break;
+                myconfig[keyid2].found = true;
+                if (myconfig[keyid2].forced)
+                  modifyitem(buffer, bias, off, keyid2, myconfig[keyid2].value);
+                else
+                  myconfig[keyid2].value = *value;
               }
             off += len+3;
           }
         else if (keyid == 0xFFFF)
           {
-            if (!vm_disabled)
-              {
-                buffer[bias+off] = PSKEY_VM_DISABLE | 0x2000;
-                buffer[bias+off+2] = 1;
-                buffer[bias+off+3] = 1;
-                buffer[bias+off+1] = buffer[bias+off] + buffer[bias+off+2] + buffer[bias+off+3];
-                off += 4;
-              }
-            if (!offchip_hci)
-              {
-                buffer[bias+off] = PSKEY_ONCHIP_HCI_CLIENT | 0x2000;
-                buffer[bias+off+2] = 1;
-                buffer[bias+off+3] = 0;
-                buffer[bias+off+1] = buffer[bias+off] + buffer[bias+off+2] + buffer[bias+off+3];
-                off += 4;
-              }
+            for (i = 0; i < sizeof(myconfig)/sizeof(*myconfig); i++)
+              if (myconfig[i].forced && !myconfig[i].found)
+                {
+                  modifyitem(buffer, bias, off, i, myconfig[i].value);
+                  off += 4;
+                }
             off = buffer_size;
           }
       }
-    cnv(buffer+bias);
-    ofstream xdv("psmod.xdv");
+    cnv(buffer, bias, dumpstr);
+    ofstream xdv(dumpstr+".xdv");
     xdv << hex << setfill('0');    
     for (i = 0; i < buffer_size; i++)
         {
@@ -694,11 +706,11 @@ void Pskey::modify(uint16_t buffer[], int bias)
         }
 }
 
-void Pskey::detect(uint16_t buffer[])
+void Pskey::detect(uint16_t buffer[], string dumpstr, void (&fptr)(uint16_t*, int, string))
 {
   uint16_t blank[buffer_size];
   memset(blank, -1, sizeof(blank));
-  if (memcmp(blank, buffer+0x2000, sizeof(blank))) modify(buffer,0x2000);
-  else if (memcmp(blank, buffer+0x3000, sizeof(blank))) modify(buffer,0x3000);
+  if (memcmp(blank, buffer+0x2000, sizeof(blank))) fptr(buffer, 0x2000, dumpstr);
+  else if (memcmp(blank, buffer+0x3000, sizeof(blank))) fptr(buffer, 0x3000, dumpstr);
   else cout << "no pskeys found" << endl;
 }
