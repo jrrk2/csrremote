@@ -623,7 +623,8 @@ void Pskey::cnv(uint16_t buffer[], int bias, string dumpstr)
         else
           off += 4;
       }
-    ofstream psf(dumpstr+".ps.txt");
+    string dumpf = dumpstr+".ps.txt";
+    ofstream psf(dumpf.c_str());
     for (i = 0; i < pskey_max; i++)
       if (pstab[i])
         {
@@ -697,7 +698,8 @@ void Pskey::modify(uint16_t buffer[], int bias, string dumpstr)
           }
       }
     cnv(buffer, bias, dumpstr);
-    ofstream xdv(dumpstr+".xdv");
+    string dumpf = dumpstr+".xdv";
+    ofstream xdv(dumpf.c_str());
     xdv << hex << setfill('0');    
     for (i = 0; i < buffer_size; i++)
         {

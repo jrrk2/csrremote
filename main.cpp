@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string>
+#include <ctype.h>
+#include <stdlib.h>
 #include "usbprogrammer.h"
 #include "devicemanager.h"
 #include "flash.h"
@@ -12,8 +14,13 @@ void usage(char* prog)
 {
     cout << "Usage: " << prog << " <action> <filename> first last loglevel" << endl;
     cout << "Action can be:" << endl;
-    cout << " dump - dump firmware from device" << endl;
-    cout << " flash - flash new firmware to device" << endl;
+    cout << " dump - dump firmware from device (NO WARRANTY)" << endl;
+    cout << " pschk - Check persistent store settings in semi lucid format (NO WARRANTY)" << endl;
+    cout << " psdump - As pschk but also dump persistent store settings in machine readable form (NO WARRANTY)" << endl;
+    cout << " psmod - Force off-chip HCI mode, virtual machine off, 115200 baud (CAUTION)" << endl;
+    cout << " flash - flash new firmware to device (DANGEROUS)" << endl;
+    cout << " erase - brick the device (DANGEROUS)" << endl;
+    cout << " disass - Display a representation of the programming algorithm (HARMLESS)" << endl;
 }
 
 int main(int argc, char **argv) {
@@ -54,18 +61,40 @@ int main(int argc, char **argv) {
     string action = argv[1];
     string stem = argv[2];
 
-    if(!UsbProgrammer::getProgrammer()->IsInitialized()) {
-        cout << "Cannot connect to programmer!" << endl;
-        return 1;
-    }
+    if (action == "disass") {
+      string dis = stem+".dis";
+      disass(dis.c_str());
+      return 0;
+    } else
+      {
+	char envcheck[99];
+	char *ptr = envcheck;
+	const char *src = action.c_str();
+	while (*src)
+	  *ptr++ = toupper((unsigned char)(*src++));
+	*ptr = 0;
+	
+	if (!getenv(envcheck) || !atoi(getenv(envcheck)))
+	  {
+	    cout << "Some actions are dangerous. Read the documentation and/or source code and confirm below" << endl;
+	    cout << "Are you sure you want this action? If so rerun after typing export " << envcheck << "=1" << endl;
+	    return 1;
+	  }
 
-    manager.wakeup();
+	if(!UsbProgrammer::getProgrammer()->IsInitialized()) {
+	  cout << "Cannot connect to programmer!" << endl;
+	  return 1;
+	}
+
+	manager.wakeup();
+	
+	if(!manager.IsSupported()) {
+	  cout << "Device is NOT supported!" << endl;
+	  return 1;
+	}
+
+      }
     
-    if(!manager.IsSupported()) {
-        cout << "Device is NOT supported!" << endl;
-        return 1;
-    }
-
     if (action == "dump") {
       cout << "first: " << first << " last: " << last << endl;
 
@@ -98,9 +127,6 @@ int main(int argc, char **argv) {
             cout << " Erase failed!" << endl;
             return 1;
         }
-    } else if (action == "disass") {
-      string dis = stem+".dis";
-      disass(dis.c_str());
     } else
       {
         cout << "Invalid action!" << endl;
